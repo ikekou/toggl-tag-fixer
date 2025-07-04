@@ -123,9 +123,13 @@ print(f"   Processed: {processed}")
 print(f"   Success: {success}")
 print(f"   Failed: {failed}")
 
+# ログディレクトリの作成
+log_dir = "logs"
+os.makedirs(log_dir, exist_ok=True)
+
 # 実行時刻をファイル名に含める（JST）
 execution_time_jst = now_jst.strftime("%Y%m%d_%H%M%S")
-log_filename = f"toggl_tag_log_{yesterday_jst}_{execution_time_jst}.json"
+log_filename = os.path.join(log_dir, f"toggl_tag_log_{yesterday_jst}_{execution_time_jst}.json")
 with open(log_filename, 'w', encoding='utf-8') as f:
     json.dump({
         "execution_date": now_jst.isoformat(),
