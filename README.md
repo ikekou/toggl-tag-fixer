@@ -80,11 +80,13 @@ WORKSPACE_ID=あなたのワークスペースID
 **どこの値を入力するか：**
 - `TOGGL_API_TOKEN=` の後に、ステップ 4 でコピーしたAPIトークン（32文字の英数字）を貼り付けます
 - `WORKSPACE_ID=` の後に、ステップ 5 で確認したワークスペースID（7桁程度の数字）を入力します
+- `TIMEZONE=` の後に、お好みのタイムゾーン（オプション、デフォルト: Asia/Tokyo）
 
 例：
 ```bash
 TOGGL_API_TOKEN=1234567890abcdef1234567890abcdef
 WORKSPACE_ID=1234567
+TIMEZONE=Asia/Tokyo
 ```
 
 ### ステップ 7: プロジェクト→タグのマッピング設定
@@ -110,7 +112,39 @@ WORKSPACE_ID=1234567
 
 **注意**: プロジェクト名は Toggl に登録されている名前と完全に一致する必要があります。
 
+## ✨ 機能一覧
+
+### 🎯 基本機能
+- ✅ 前日分のタイムエントリーからタグ未設定を自動検出
+- ✅ プロジェクト名に基づく自動タグ付け
+- ✅ 詳細なログ出力（JSON形式）
+
+### 📅 日付処理
+- ✅ 特定日付の指定（--date）
+- ✅ 今日のエントリー処理（--today）
+- ✅ 過去複数日の一括処理（--days）
+- ✅ タイムゾーン対応（.env設定）
+
+### 🛡️ 安全性
+- ✅ Dry-runモードで事前確認
+- ✅ APIトークン・ワークスペースの検証
+- ✅ config.jsonの構文チェック
+- ✅ 詳細なエラーメッセージ
+
+### 🚀 パフォーマンス
+- ✅ プロジェクト情報のキャッシュ
+- ✅ ネットワークエラー時のリトライ（指数バックオフ）
+- ✅ 効率的なAPI呼び出し
+
+### 🎨 ユーザビリティ
+- ✅ インタラクティブモード（対話的タグ選択）
+- ✅ カラフルな出力とアイコン
+- ✅ 包括的なヘルプとドキュメント
+- ✅ 進捗表示とキャッシュ統計
+
 ## 🎯 実行方法
+
+### 基本的な使い方
 
 すべての設定が完了したら、以下のコマンドで実行：
 
@@ -118,26 +152,118 @@ WORKSPACE_ID=1234567
 python main.py
 ```
 
+### 詳細なオプション
+
+ツールには多くの便利なオプションが用意されています：
+
+#### 日付指定オプション
+```bash
+# デフォルト: 昨日のエントリーを処理
+python main.py
+
+# 特定の日付を処理
+python main.py --date 2025-07-01
+
+# 今日のエントリーを処理
+python main.py --today
+
+# 過去3日分を一括処理
+python main.py --days 3
+```
+
+#### 安全確認オプション
+```bash
+# 実際に更新せずに対象エントリーを確認（推奨）
+python main.py --dry-run
+
+# 特定日付をdry-runで確認
+python main.py --date 2025-07-01 --dry-run
+```
+
+#### インタラクティブモード
+```bash
+# 対話的にタグを選択・編集
+python main.py --interactive
+
+# インタラクティブモードでdry-run
+python main.py --interactive --dry-run
+```
+
+インタラクティブモードでは、各エントリーに対して以下の選択肢が表示されます：
+- **1. 提案されたタグを使用**: config.jsonで定義されたタグを自動適用
+- **2. カスタムタグを入力**: 手動でタグを入力（カンマ区切りで複数可）
+- **3. よく使われるタグから選択**: 既存のタグから番号で選択
+- **4. スキップ**: そのエントリーにはタグを追加しない
+
+#### その他のオプション
+```bash
+# ヘルプを表示
+python main.py --help
+
+# バージョンを表示
+python main.py --version
+```
+
+### タイムゾーン設定（オプション）
+
+デフォルトは日本時間（Asia/Tokyo）ですが、.envファイルで変更可能：
+
+```bash
+# .envファイルに追加
+TIMEZONE=America/New_York  # ニューヨーク時間
+TIMEZONE=Europe/London     # ロンドン時間
+TIMEZONE=UTC              # UTC時間
+```
+
 ## 📊 実行結果の見方
 
+### 通常モード
 実行すると以下のような出力が表示されます：
 
 ```
-🔍 Fetching time entries for 2024-01-14...
+✅ Config validation passed: 11 projects defined
+🔐 Validating API access...
+✅ API token valid for user: あなたの名前 (email@example.com)
+✅ Workspace access confirmed: ワークスペース名 (ID: 1234567)
+
+==================================================
+🔍 Processing date: 2025-07-04 (Asia/Tokyo)
+==================================================
 📊 Found 15 time entries
 ✅ 社内ミーティング -> ['meeting', 'internal']
 ✅ A社案件 -> ['client', 'development']
 ❌ B社案件 403 Forbidden
 
-📈 Summary:
+📈 Summary for 2025-07-04:
    Total entries: 15
    Processed: 3
    Success: 2
    Failed: 1
+📝 Log saved to: logs/toggl_tag_log_2025-07-04_20250705_123456.json
+💾 Project cache: 5 projects cached
 ```
 
+### Dry-runモード
+```bash
+python main.py --dry-run
+```
+```
+🔍 [DRY RUN] 社内ミーティング -> ['meeting', 'internal']
+🔍 [DRY RUN] A社案件 -> ['client', 'development']
+
+📈 Summary for 2025-07-04:
+   Total entries: 15
+   Processed: 2
+   Would be updated: 2
+   Failed: 0
+```
+
+### アイコンの意味
 - ✅ : タグの追加に成功
+- 🔍 : Dry-runモード（実際の更新なし）
 - ❌ : タグの追加に失敗（権限エラーなど）
+- 💾 : プロジェクトキャッシュの統計
+- 📝 : ログファイルの保存場所
 
 ## 🔧 トラブルシューティング
 
@@ -158,6 +284,23 @@ API トークンが正しいか確認してください。トークンが期限�
 
 - プロジェクト名が `config.json` の設定と完全に一致しているか確認
 - 対象のエントリーに既にタグが設定されていないか確認（既にタグがある場合はスキップされます）
+
+### エラー: "Invalid timezone"
+
+`.env` ファイルのTIMEZONE設定を確認してください：
+- 正しい形式: `Asia/Tokyo`, `America/New_York`, `Europe/London`, `UTC`
+- [タイムゾーン一覧](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)で確認可能
+
+### config.jsonのエラー
+
+- JSON形式が正しいか確認（コンマ、括弧、引用符）
+- プロジェクト名が文字列、タグが配列になっているか確認
+- 最後の項目の後にコンマがないか確認
+
+### インタラクティブモードで応答しない
+
+- 数字（1-4）を入力してEnterキーを押してください
+- Ctrl+Cで中断可能です
 
 ## 🤖 自動実行の設定（オプション）
 
