@@ -3,6 +3,7 @@ import os
 import json
 import requests
 import argparse
+import time
 from base64 import b64encode
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
@@ -57,6 +58,38 @@ def parse_arguments():
     
     return parser.parse_args()
 
+def make_request_with_retry(method, url, headers, max_retries=3, **kwargs):
+    """リトライ機能付きのHTTPリクエスト"""
+    for attempt in range(max_retries):
+        try:
+            if method.upper() == 'GET':
+                response = requests.get(url, headers=headers, **kwargs)
+            elif method.upper() == 'PUT':
+                response = requests.put(url, headers=headers, **kwargs)
+            else:
+                raise ValueError(f"Unsupported HTTP method: {method}")
+            
+            # 成功またはクライアントエラー（4xx）の場合はリトライしない
+            if response.status_code < 500:
+                return response
+            
+            # サーバーエラー（5xx）の場合はリトライ
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt  # 指数バックオフ
+                print(f"⏳ Server error {response.status_code}, retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
+            
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt
+                print(f"⏳ Network error: {e}, retrying in {wait_time}s... (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
+            else:
+                print(f"❌ Network error after {max_retries} attempts: {e}")
+                raise
+    
+    return response
+
 def main():
     """メイン処理"""
     args = parse_arguments()
@@ -87,6 +120,9 @@ def main():
     }
 
     now_local = datetime.now(user_tz)
+    
+    # プロジェクト情報のキャッシュ
+    project_cache = {}
     
     # 処理する日付を決定
     if args.date:
@@ -130,7 +166,7 @@ def main():
             "end_date": end_date
         }
 
-        response = requests.get(url, headers=auth_header, params=params)
+        response = make_request_with_retry('GET', url, auth_header, params=params)
 
         if response.status_code != 200:
             print(f"❌ Failed to fetch time entries: {response.status_code} {response.reason}")
@@ -154,15 +190,30 @@ def main():
             if not project_id:
                 continue
             
-            project_url = f"https://api.track.toggl.com/api/v9/workspaces/{WORKSPACE_ID}/projects/{project_id}"
-            project_response = requests.get(project_url, headers=auth_header)
-            
-            if project_response.status_code != 200:
-                print(f"❌ Failed to fetch project {project_id}: {project_response.status_code}")
-                continue
-            
-            project_data = project_response.json()
-            project_name = project_data.get('name', '')
+            # プロジェクト情報をキャッシュから取得、なければAPIで取得
+            if project_id in project_cache:
+                project_name = project_cache[project_id]
+            else:
+                project_url = f"https://api.track.toggl.com/api/v9/workspaces/{WORKSPACE_ID}/projects/{project_id}"
+                try:
+                    project_response = make_request_with_retry('GET', project_url, auth_header)
+                    
+                    if project_response.status_code != 200:
+                        print(f"❌ Failed to fetch project {project_id}: {project_response.status_code} {project_response.reason}")
+                        if project_response.status_code == 403:
+                            print(f"   ℹ️  Hint: Check if you have access to this project in workspace {WORKSPACE_ID}")
+                        elif project_response.status_code == 404:
+                            print(f"   ℹ️  Hint: Project {project_id} may have been deleted or moved")
+                        continue
+                    
+                    project_data = project_response.json()
+                    project_name = project_data.get('name', '')
+                    # キャッシュに保存
+                    project_cache[project_id] = project_name
+                    
+                except requests.exceptions.RequestException as e:
+                    print(f"❌ Network error fetching project {project_id}: {e}")
+                    continue
             
             if project_name not in PROJECT_TAG_MAP:
                 continue
@@ -190,7 +241,21 @@ def main():
                 success += 1
             else:
                 # 実際に更新する
-                update_response = requests.put(update_url, headers=auth_header, json=update_data)
+                try:
+                    update_response = make_request_with_retry('PUT', update_url, auth_header, json=update_data)
+                except requests.exceptions.RequestException as e:
+                    failed += 1
+                    print(f"❌ {project_name} Network error: {e}")
+                    log_entry = {
+                        "timestamp": now_local.isoformat(),
+                        "status": "network_error",
+                        "entry_id": entry['id'],
+                        "project_name": project_name,
+                        "description": entry.get('description', ''),
+                        "error_message": str(e)
+                    }
+                    log_entries.append(log_entry)
+                    continue
             
                 if update_response.status_code == 200:
                     success += 1
@@ -250,6 +315,10 @@ def main():
                 "changes": log_entries
             }, f, indent=2, ensure_ascii=False)
         print(f"📝 Log saved to: {log_filename}")
+        
+        # キャッシュ統計の表示
+        if project_cache:
+            print(f"💾 Project cache: {len(project_cache)} projects cached")
 
 if __name__ == "__main__":
     main()
