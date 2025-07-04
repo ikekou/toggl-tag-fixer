@@ -64,7 +64,13 @@ curl -u YOUR_API_TOKEN:api_token https://api.track.toggl.com/api/v9/me
 
 ### ステップ 6: 環境変数の設定
 
-`.env` ファイルを編集して、取得した情報を入力：
+`.env.sample` を `.env` にコピーして、取得した情報を入力：
+
+```bash
+cp .env.sample .env
+```
+
+次に `.env` ファイルを編集：
 
 ```bash
 TOGGL_API_TOKEN=あなたのAPIトークン
