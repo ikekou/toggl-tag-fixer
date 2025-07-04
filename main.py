@@ -48,6 +48,13 @@ def parse_arguments():
         metavar='N'
     )
     
+    # その他のオプション
+    parser.add_argument(
+        '--dry-run',
+        action='store_true',
+        help='実際に更新せずに対象エントリーを表示'
+    )
+    
     return parser.parse_args()
 
 def main():
@@ -157,43 +164,63 @@ def main():
             update_url = f"https://api.track.toggl.com/api/v9/workspaces/{WORKSPACE_ID}/time_entries/{entry['id']}"
             update_data = {"tags": tags_to_add}
             
-            update_response = requests.put(update_url, headers=auth_header, json=update_data)
-            
             processed += 1
             
-            if update_response.status_code == 200:
-                success += 1
-                print(f"✅ {project_name} -> {tags_to_add}")
+            if args.dry_run:
+                # Dry-runモードでは実際に更新しない
+                print(f"🔍 [DRY RUN] {project_name} -> {tags_to_add}")
                 log_entry = {
                     "timestamp": now_jst.isoformat(),
-                    "status": "success",
+                    "status": "dry_run",
                     "entry_id": entry['id'],
                     "project_name": project_name,
                     "description": entry.get('description', ''),
                     "start": entry.get('start', ''),
                     "duration": entry.get('duration', 0),
-                    "tags_added": tags_to_add
+                    "tags_to_add": tags_to_add
                 }
+                success += 1
             else:
-                failed += 1
-                print(f"❌ {project_name} {update_response.status_code} {update_response.reason}")
-                log_entry = {
-                    "timestamp": now_jst.isoformat(),
-                    "status": "failed",
-                    "entry_id": entry['id'],
-                    "project_name": project_name,
-                    "description": entry.get('description', ''),
-                    "error_code": update_response.status_code,
-                    "error_reason": update_response.reason
-                }
+                # 実際に更新する
+                update_response = requests.put(update_url, headers=auth_header, json=update_data)
+            
+                if update_response.status_code == 200:
+                    success += 1
+                    print(f"✅ {project_name} -> {tags_to_add}")
+                    log_entry = {
+                        "timestamp": now_jst.isoformat(),
+                        "status": "success",
+                        "entry_id": entry['id'],
+                        "project_name": project_name,
+                        "description": entry.get('description', ''),
+                        "start": entry.get('start', ''),
+                        "duration": entry.get('duration', 0),
+                        "tags_added": tags_to_add
+                    }
+                else:
+                    failed += 1
+                    print(f"❌ {project_name} {update_response.status_code} {update_response.reason}")
+                    log_entry = {
+                        "timestamp": now_jst.isoformat(),
+                        "status": "failed",
+                        "entry_id": entry['id'],
+                        "project_name": project_name,
+                        "description": entry.get('description', ''),
+                        "error_code": update_response.status_code,
+                        "error_reason": update_response.reason
+                    }
             
             log_entries.append(log_entry)
 
         print(f"\n📈 Summary for {target_date}:")
         print(f"   Total entries: {len(entries)}")
         print(f"   Processed: {processed}")
-        print(f"   Success: {success}")
-        print(f"   Failed: {failed}")
+        if args.dry_run:
+            print(f"   Would be updated: {success}")
+            print(f"   Failed: {failed}")
+        else:
+            print(f"   Success: {success}")
+            print(f"   Failed: {failed}")
 
         # ログディレクトリの作成
         log_dir = "logs"
