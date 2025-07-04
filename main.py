@@ -20,6 +20,7 @@ def parse_arguments():
   %(prog)s --date 2025-07-01  # 特定の日付を処理
   %(prog)s --today            # 今日のエントリーを処理
   %(prog)s --dry-run          # 実際に更新せずに確認
+  %(prog)s --interactive      # 対話的にタグを選択
         '''
     )
     
@@ -54,6 +55,12 @@ def parse_arguments():
         '--dry-run',
         action='store_true',
         help='実際に更新せずに対象エントリーを表示'
+    )
+    
+    parser.add_argument(
+        '--interactive',
+        action='store_true',
+        help='対話的にタグを選択・編集する'
     )
     
     return parser.parse_args()
@@ -134,7 +141,7 @@ def validate_config_file(config_path):
     print(f"✅ Config validation passed: {len(config)} projects defined")
     return True, config
 
-def validate_api_access(api_token, workspace_id, auth_header):
+def validate_api_access(workspace_id, auth_header):
     """APIトークンとワークスペースアクセスの検証"""
     print("🔐 Validating API access...")
     
@@ -187,6 +194,83 @@ def validate_api_access(api_token, workspace_id, auth_header):
     
     return True
 
+def interactive_tag_selection(entry, project_name, suggested_tags, all_used_tags):
+    """インタラクティブなタグ選択"""
+    print(f"\n📝 Entry: {entry.get('description', 'No description')}")
+    print(f"🏷️  Project: {project_name}")
+    print(f"⏱️  Duration: {entry.get('duration', 0) / 3600:.1f} hours")
+    print(f"📅 Start: {entry.get('start', 'Unknown')}")
+    
+    if suggested_tags:
+        print(f"\n💡 Suggested tags: {', '.join(suggested_tags)}")
+    
+    print(f"\n選択肢:")
+    print(f"  1. 提案されたタグを使用: {suggested_tags}")
+    print(f"  2. カスタムタグを入力")
+    print(f"  3. よく使われるタグから選択")
+    print(f"  4. スキップ（タグを追加しない）")
+    
+    while True:
+        try:
+            choice = input("\n選択してください (1-4): ").strip()
+            
+            if choice == '1':
+                return suggested_tags
+            
+            elif choice == '2':
+                print("\nカスタムタグを入力してください（カンマ区切りで複数可）:")
+                custom_input = input("タグ: ").strip()
+                if custom_input:
+                    custom_tags = [tag.strip() for tag in custom_input.split(',') if tag.strip()]
+                    return custom_tags
+                else:
+                    print("❌ タグが入力されませんでした")
+                    continue
+            
+            elif choice == '3':
+                if all_used_tags:
+                    print(f"\nよく使われるタグ:")
+                    sorted_tags = sorted(list(all_used_tags))
+                    for i, tag in enumerate(sorted_tags[:10], 1):  # 最大10個表示
+                        print(f"  {i}. {tag}")
+                    
+                    tag_choice = input("\n番号を選択してください（複数選択は「1,3,5」のように）: ").strip()
+                    try:
+                        indices = [int(x.strip()) - 1 for x in tag_choice.split(',')]
+                        selected_tags = [sorted_tags[i] for i in indices if 0 <= i < len(sorted_tags)]
+                        if selected_tags:
+                            return selected_tags
+                        else:
+                            print("❌ 有効な番号が選択されませんでした")
+                            continue
+                    except (ValueError, IndexError):
+                        print("❌ 無効な入力です")
+                        continue
+                else:
+                    print("⚠️  利用可能なタグがありません")
+                    continue
+            
+            elif choice == '4':
+                return None  # スキップ
+            
+            else:
+                print("❌ 1-4の数字を入力してください")
+                continue
+                
+        except KeyboardInterrupt:
+            print("\n\n❌ 操作がキャンセルされました")
+            return None
+        except EOFError:
+            print("\n\n❌ 入力が終了しました")
+            return None
+
+def collect_all_used_tags(project_tag_map):
+    """設定ファイルから全ての使用されているタグを収集"""
+    all_tags = set()
+    for tags in project_tag_map.values():
+        all_tags.update(tags)
+    return all_tags
+
 def main():
     """メイン処理"""
     args = parse_arguments()
@@ -219,13 +303,16 @@ def main():
     }
 
     # APIアクセスの検証
-    if not validate_api_access(API_TOKEN, WORKSPACE_ID, auth_header):
+    if not validate_api_access(WORKSPACE_ID, auth_header):
         exit(1)
 
     now_local = datetime.now(user_tz)
     
     # プロジェクト情報のキャッシュ
     project_cache = {}
+    
+    # インタラクティブモード用の全タグリスト
+    all_used_tags = collect_all_used_tags(PROJECT_TAG_MAP) if args.interactive else set()
     
     # 処理する日付を決定
     if args.date:
@@ -318,10 +405,21 @@ def main():
                     print(f"❌ Network error fetching project {project_id}: {e}")
                     continue
             
-            if project_name not in PROJECT_TAG_MAP:
-                continue
+            # タグの決定
+            suggested_tags = PROJECT_TAG_MAP.get(project_name, [])
             
-            tags_to_add = PROJECT_TAG_MAP[project_name]
+            if args.interactive:
+                # インタラクティブモード: ユーザーがタグを選択
+                selected_tags = interactive_tag_selection(entry, project_name, suggested_tags, all_used_tags)
+                if selected_tags is None:
+                    print("⏭️  Skipped")
+                    continue
+                tags_to_add = selected_tags
+            else:
+                # 通常モード: 設定ファイルのマッピングに従う
+                if project_name not in PROJECT_TAG_MAP:
+                    continue
+                tags_to_add = suggested_tags
             
             update_url = f"https://api.track.toggl.com/api/v9/workspaces/{WORKSPACE_ID}/time_entries/{entry['id']}"
             update_data = {"tags": tags_to_add}
