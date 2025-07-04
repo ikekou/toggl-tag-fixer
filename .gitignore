@@ -21,6 +21,7 @@ ENV/
 # Logs
 *.log
 log.txt
+toggl_tag_log_*.json
 
 # OS
 .DS_Store

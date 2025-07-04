@@ -47,9 +47,20 @@ pip install -r requirements.txt
 
 ### ステップ 5: ワークスペース ID の取得
 
-1. Toggl Track のウェブアプリで、左側のメニューから使用するワークスペースを選択
-2. ブラウザの URL を確認：`https://track.toggl.com/XXX/timer`
-3. `XXX` の部分がワークスペース ID です（例：1234567）
+**方法1: ブラウザの開発者ツールを使用**
+1. Toggl Track のウェブアプリで、F12キーを押して開発者ツールを開く
+2. Networkタブを選択
+3. ページをリロード（F5キー）
+4. リクエスト一覧から「me」というAPIコールを探してクリック
+5. ResponseまたはPreviewタブで、`default_workspace_id` の値を確認
+
+**方法2: Toggl APIを直接呼び出し**
+1. ターミナルまたはコマンドプロンプトを開く
+2. 以下のコマンドを実行（YOUR_API_TOKENを実際のトークンに置き換える）：
+```bash
+curl -u YOUR_API_TOKEN:api_token https://api.track.toggl.com/api/v9/me
+```
+3. 返されたJSONデータから `default_workspace_id` の値を確認
 
 ### ステップ 6: 環境変数の設定
 

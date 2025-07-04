@@ -1,5 +1,13 @@
 {
-  "Project Alpha": ["work", "design"],
-  "Project Beta":  ["meeting"],
-  "Project Gamma": ["research"]
+  "exhibition research": ["r:Research"],
+  "morning routine":  ["a:Admin"],
+  "task and schedule management":  ["a:Admin"],
+  "evangelion2026":  ["p:Production"],
+  "entangle-moment":  ["p:Production"],
+  "ysn":  ["p:Production"],
+  "bd website":  ["b:BizDev"],
+  "form":  ["p:Production"],
+  "zuiunan":  ["p:Production"],
+  "news":  ["r:Research"],
+  "touchdesigner" : ["r:Research"]
 }
