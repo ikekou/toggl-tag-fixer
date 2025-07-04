@@ -90,6 +90,103 @@ def make_request_with_retry(method, url, headers, max_retries=3, **kwargs):
     
     return response
 
+def validate_config_file(config_path):
+    """config.jsonの検証"""
+    try:
+        with open(config_path, 'r', encoding='utf-8') as f:
+            config = json.load(f)
+    except FileNotFoundError:
+        print(f"❌ Error: {config_path} not found")
+        print(f"   💡 Hint: Create {config_path} with project name to tag mappings")
+        return False, {}
+    except json.JSONDecodeError as e:
+        print(f"❌ Error: Invalid JSON in {config_path}")
+        print(f"   💡 Hint: Check JSON syntax at line {e.lineno}, column {e.colno}")
+        return False, {}
+    
+    if not isinstance(config, dict):
+        print(f"❌ Error: {config_path} must contain a JSON object")
+        return False, {}
+    
+    if not config:
+        print(f"⚠️  Warning: {config_path} is empty - no project mappings defined")
+        return True, {}
+    
+    # プロジェクト名とタグの検証
+    for project_name, tags in config.items():
+        if not isinstance(project_name, str) or not project_name.strip():
+            print(f"❌ Error: Project name must be a non-empty string: {repr(project_name)}")
+            return False, {}
+        
+        if not isinstance(tags, list):
+            print(f"❌ Error: Tags for '{project_name}' must be a list, got {type(tags).__name__}")
+            return False, {}
+        
+        if not tags:
+            print(f"⚠️  Warning: Project '{project_name}' has empty tag list")
+            continue
+        
+        for tag in tags:
+            if not isinstance(tag, str) or not tag.strip():
+                print(f"❌ Error: Tag must be a non-empty string in project '{project_name}': {repr(tag)}")
+                return False, {}
+    
+    print(f"✅ Config validation passed: {len(config)} projects defined")
+    return True, config
+
+def validate_api_access(api_token, workspace_id, auth_header):
+    """APIトークンとワークスペースアクセスの検証"""
+    print("🔐 Validating API access...")
+    
+    # APIトークンの有効性確認
+    try:
+        me_response = make_request_with_retry('GET', 'https://api.track.toggl.com/api/v9/me', auth_header)
+        if me_response.status_code == 401:
+            print("❌ Error: Invalid API token")
+            print("   💡 Hint: Check TOGGL_API_TOKEN in .env file")
+            return False
+        elif me_response.status_code != 200:
+            print(f"❌ Error: Failed to validate API token: {me_response.status_code} {me_response.reason}")
+            return False
+        
+        user_data = me_response.json()
+        print(f"✅ API token valid for user: {user_data.get('fullname', 'Unknown')} ({user_data.get('email', 'Unknown')})")
+        
+        # デフォルトワークスペースIDの確認
+        default_workspace = user_data.get('default_workspace_id')
+        if default_workspace and str(default_workspace) != str(workspace_id):
+            print(f"⚠️  Warning: Using workspace {workspace_id}, but your default is {default_workspace}")
+    
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Error: Network error validating API access: {e}")
+        return False
+    
+    # ワークスペースアクセス権限の確認
+    try:
+        workspace_url = f"https://api.track.toggl.com/api/v9/workspaces/{workspace_id}"
+        workspace_response = make_request_with_retry('GET', workspace_url, auth_header)
+        
+        if workspace_response.status_code == 403:
+            print(f"❌ Error: No access to workspace {workspace_id}")
+            print("   💡 Hint: Check if you're a member of this workspace")
+            return False
+        elif workspace_response.status_code == 404:
+            print(f"❌ Error: Workspace {workspace_id} not found")
+            print("   💡 Hint: Verify WORKSPACE_ID in .env file")
+            return False
+        elif workspace_response.status_code != 200:
+            print(f"❌ Error: Failed to access workspace: {workspace_response.status_code} {workspace_response.reason}")
+            return False
+        
+        workspace_data = workspace_response.json()
+        print(f"✅ Workspace access confirmed: {workspace_data.get('name', 'Unknown')} (ID: {workspace_id})")
+        
+    except requests.exceptions.RequestException as e:
+        print(f"❌ Error: Network error validating workspace access: {e}")
+        return False
+    
+    return True
+
 def main():
     """メイン処理"""
     args = parse_arguments()
@@ -112,12 +209,18 @@ def main():
         print(f"   Common timezones: Asia/Tokyo, America/New_York, Europe/London, UTC")
         exit(1)
     
-    with open('config.json', 'r', encoding='utf-8') as f:
-        PROJECT_TAG_MAP = json.load(f)
+    # config.jsonの検証
+    config_valid, PROJECT_TAG_MAP = validate_config_file('config.json')
+    if not config_valid:
+        exit(1)
 
     auth_header = {
         "Authorization": f"Basic {b64encode(f'{API_TOKEN}:api_token'.encode()).decode()}"
     }
+
+    # APIアクセスの検証
+    if not validate_api_access(API_TOKEN, WORKSPACE_ID, auth_header):
+        exit(1)
 
     now_local = datetime.now(user_tz)
     
