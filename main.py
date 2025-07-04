@@ -65,9 +65,18 @@ def main():
     
     API_TOKEN = os.getenv('TOGGL_API_TOKEN')
     WORKSPACE_ID = os.getenv('WORKSPACE_ID')
+    TIMEZONE = os.getenv('TIMEZONE', 'Asia/Tokyo')  # デフォルトは日本時間
     
     if not API_TOKEN or not WORKSPACE_ID:
         print("❌ Error: TOGGL_API_TOKEN and WORKSPACE_ID must be set in .env file")
+        exit(1)
+    
+    # タイムゾーンの検証
+    try:
+        user_tz = ZoneInfo(TIMEZONE)
+    except Exception as e:
+        print(f"❌ Error: Invalid timezone '{TIMEZONE}'. Please check TIMEZONE in .env file.")
+        print(f"   Common timezones: Asia/Tokyo, America/New_York, Europe/London, UTC")
         exit(1)
     
     with open('config.json', 'r', encoding='utf-8') as f:
@@ -77,8 +86,7 @@ def main():
         "Authorization": f"Basic {b64encode(f'{API_TOKEN}:api_token'.encode()).decode()}"
     }
 
-    jst = ZoneInfo("Asia/Tokyo")
-    now_jst = datetime.now(jst)
+    now_local = datetime.now(user_tz)
     
     # 処理する日付を決定
     if args.date:
@@ -91,30 +99,30 @@ def main():
         dates_to_process = [target_date]
     elif args.today:
         # 今日を処理
-        dates_to_process = [now_jst.date()]
+        dates_to_process = [now_local.date()]
     elif args.days:
         # 過去N日分を処理
         if args.days < 1:
             print(f"❌ Error: --days は1以上の数値を指定してください")
             exit(1)
-        dates_to_process = [now_jst.date() - timedelta(days=i) for i in range(args.days)]
+        dates_to_process = [now_local.date() - timedelta(days=i) for i in range(args.days)]
     else:
         # デフォルト: 昨日を処理
-        dates_to_process = [now_jst.date() - timedelta(days=1)]
+        dates_to_process = [now_local.date() - timedelta(days=1)]
     
     # 各日付を処理
     for target_date in dates_to_process:
         print(f"\n{'='*50}")
-        print(f"🔍 Processing date: {target_date} (JST)")
+        print(f"🔍 Processing date: {target_date} ({TIMEZONE})")
         print(f"{'='*50}")
         
-        # JSTの00:00:00と23:59:59をUTCに変換
-        start_jst = datetime.combine(target_date, datetime.min.time()).replace(tzinfo=jst)
-        end_jst = datetime.combine(target_date, datetime.max.time()).replace(tzinfo=jst)
+        # ユーザータイムゾーンの00:00:00と23:59:59をUTCに変換
+        start_local = datetime.combine(target_date, datetime.min.time()).replace(tzinfo=user_tz)
+        end_local = datetime.combine(target_date, datetime.max.time()).replace(tzinfo=user_tz)
 
         # ISO形式でUTC時刻として出力
-        start_date = start_jst.astimezone(ZoneInfo("UTC")).isoformat().replace("+00:00", "Z")
-        end_date = end_jst.astimezone(ZoneInfo("UTC")).isoformat().replace("+00:00", "Z")
+        start_date = start_local.astimezone(ZoneInfo("UTC")).isoformat().replace("+00:00", "Z")
+        end_date = end_local.astimezone(ZoneInfo("UTC")).isoformat().replace("+00:00", "Z")
 
         url = "https://api.track.toggl.com/api/v9/me/time_entries"
         params = {
@@ -170,7 +178,7 @@ def main():
                 # Dry-runモードでは実際に更新しない
                 print(f"🔍 [DRY RUN] {project_name} -> {tags_to_add}")
                 log_entry = {
-                    "timestamp": now_jst.isoformat(),
+                    "timestamp": now_local.isoformat(),
                     "status": "dry_run",
                     "entry_id": entry['id'],
                     "project_name": project_name,
@@ -188,7 +196,7 @@ def main():
                     success += 1
                     print(f"✅ {project_name} -> {tags_to_add}")
                     log_entry = {
-                        "timestamp": now_jst.isoformat(),
+                        "timestamp": now_local.isoformat(),
                         "status": "success",
                         "entry_id": entry['id'],
                         "project_name": project_name,
@@ -201,7 +209,7 @@ def main():
                     failed += 1
                     print(f"❌ {project_name} {update_response.status_code} {update_response.reason}")
                     log_entry = {
-                        "timestamp": now_jst.isoformat(),
+                        "timestamp": now_local.isoformat(),
                         "status": "failed",
                         "entry_id": entry['id'],
                         "project_name": project_name,
@@ -227,11 +235,11 @@ def main():
         os.makedirs(log_dir, exist_ok=True)
 
         # 実行時刻をファイル名に含める（JST）
-        execution_time_jst = now_jst.strftime("%Y%m%d_%H%M%S")
-        log_filename = os.path.join(log_dir, f"toggl_tag_log_{target_date}_{execution_time_jst}.json")
+        execution_time = now_local.strftime("%Y%m%d_%H%M%S")
+        log_filename = os.path.join(log_dir, f"toggl_tag_log_{target_date}_{execution_time}.json")
         with open(log_filename, 'w', encoding='utf-8') as f:
             json.dump({
-                "execution_date": now_jst.isoformat(),
+                "execution_date": now_local.isoformat(),
                 "target_date": str(target_date),
                 "summary": {
                     "total_entries": len(entries),
