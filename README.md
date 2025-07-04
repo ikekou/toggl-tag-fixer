@@ -1,238 +1,240 @@
-# Toggl タグ自動補完ツール
+# Toggl Tag Fixer
 
-このツールは、Toggl Track の前日分のタイムエントリーから、タグが未設定のものを自動的に検出し、プロジェクト名に基づいてタグを追加します。
+[日本語](README.ja.md) | English
 
-## 📋 必要なもの
+An automated tool that detects untagged time entries in Toggl Track and adds tags based on project name mappings.
 
-- Python 3.9 以上
-- Toggl Track アカウント
-- Toggl API トークン
-- ワークスペース ID
+## 📋 Requirements
 
-## 🚀 セットアップ手順
+- Python 3.9+
+- Toggl Track account
+- Toggl API token
+- Workspace ID
 
-### ステップ 1: リポジトリのクローンまたはダウンロード
+## 🚀 Setup
+
+### Step 1: Clone or Download Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/ikekou/toggl-tag-fixer.git
 cd toggl-tag-fixer
 ```
 
-### ステップ 2: Python 仮想環境の作成（推奨）
+### Step 2: Create Python Virtual Environment (Recommended)
 
 ```bash
 python -m venv venv
 
-# Mac/Linux の場合
+# Mac/Linux
 source venv/bin/activate
 
-# Windows の場合
+# Windows
 venv\Scripts\activate
 ```
 
-### ステップ 3: 依存ライブラリのインストール
+### Step 3: Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### ステップ 4: Toggl API トークンの取得
+### Step 4: Get Toggl API Token
 
-1. [Toggl Track](https://track.toggl.com) にログイン
-2. 左のサイドバーを開く
-3. サイドバー内の「Profile」ボタンをクリック
-4. プロフィールページが開いたら、一番下までスクロール
-5. 「API Token」セクションの「Click to reveal」または「Show」をクリックしてトークンを表示
-6. 表示された32文字の英数字のトークンをコピー
+1. Log in to [Toggl Track](https://track.toggl.com)
+2. Open the left sidebar
+3. Click "Profile" button in the sidebar
+4. Scroll to the bottom of the profile page
+5. Click "Click to reveal" or "Show" in the "API Token" section
+6. Copy the 32-character alphanumeric token
 
-### ステップ 5: ワークスペース ID の取得
+### Step 5: Get Workspace ID
 
-**方法1: ブラウザの開発者ツールを使用**
-1. Toggl Track のウェブアプリで、F12キーを押して開発者ツールを開く
-2. Networkタブを選択
-3. ページをリロード（F5キー）
-4. リクエスト一覧から「me」というAPIコールを探してクリック
-5. ResponseまたはPreviewタブで、`default_workspace_id` の値を確認
+**Method 1: Using Browser Developer Tools**
+1. Open developer tools (F12) in Toggl Track web app
+2. Go to Network tab
+3. Reload the page (F5)
+4. Find "me" API call in the request list and click it
+5. Check `default_workspace_id` value in Response or Preview tab
 
-**方法2: Toggl APIを直接呼び出し**
-1. ターミナルまたはコマンドプロンプトを開く
-2. 以下のコマンドを実行（YOUR_API_TOKENを実際のトークンに置き換える）：
+**Method 2: Direct API Call**
+1. Open terminal or command prompt
+2. Run the following command (replace YOUR_API_TOKEN with actual token):
 ```bash
 curl -u YOUR_API_TOKEN:api_token https://api.track.toggl.com/api/v9/me
 ```
-3. 返されたJSONデータから `default_workspace_id` の値を確認
+3. Find `default_workspace_id` value in the returned JSON data
 
-### ステップ 6: 環境変数の設定
+### Step 6: Configure Environment Variables
 
-`.env.sample` を `.env` にコピーして、取得した情報を入力：
+Copy `.env.sample` to `.env` and enter your information:
 
 ```bash
 cp .env.sample .env
 ```
 
-次に `.env` ファイルを編集：
+Edit the `.env` file:
 
 ```bash
-TOGGL_API_TOKEN=あなたのAPIトークン
-WORKSPACE_ID=あなたのワークスペースID
+TOGGL_API_TOKEN=your_api_token_here
+WORKSPACE_ID=your_workspace_id_here
 ```
 
-**どこの値を入力するか：**
-- `TOGGL_API_TOKEN=` の後に、ステップ 4 でコピーしたAPIトークン（32文字の英数字）を貼り付けます
-- `WORKSPACE_ID=` の後に、ステップ 5 で確認したワークスペースID（7桁程度の数字）を入力します
-- `TIMEZONE=` の後に、お好みのタイムゾーン（オプション、デフォルト: Asia/Tokyo）
+**Values to enter:**
+- `TOGGL_API_TOKEN=` followed by the API token (32-character alphanumeric) from Step 4
+- `WORKSPACE_ID=` followed by the workspace ID (7-digit number) from Step 5
+- `TIMEZONE=` followed by your preferred timezone (optional, default: Asia/Tokyo)
 
-例：
+Example:
 ```bash
 TOGGL_API_TOKEN=1234567890abcdef1234567890abcdef
 WORKSPACE_ID=1234567
 TIMEZONE=Asia/Tokyo
 ```
 
-### ステップ 7: プロジェクト→タグのマッピング設定
+### Step 7: Configure Project→Tag Mappings
 
-`config.json` ファイルを編集して、あなたのプロジェクト名とタグを設定：
+Edit `config.json` file to set your project names and tags:
 
 ```json
 {
-  "実際のプロジェクト名1": ["タグ1", "タグ2"],
-  "実際のプロジェクト名2": ["タグ3"],
-  "実際のプロジェクト名3": ["タグ4", "タグ5"]
+  "Project Name 1": ["tag1", "tag2"],
+  "Project Name 2": ["tag3"],
+  "Project Name 3": ["tag4", "tag5"]
 }
 ```
 
-例：
+Example:
 ```json
 {
-  "社内ミーティング": ["meeting", "internal"],
-  "A社案件": ["client", "development"],
-  "勉強・研修": ["learning"]
+  "Internal Meeting": ["meeting", "internal"],
+  "Client A Project": ["client", "development"],
+  "Learning & Training": ["learning"]
 }
 ```
 
-**注意**: プロジェクト名は Toggl に登録されている名前と完全に一致する必要があります。
+**Note**: Project names must exactly match those registered in Toggl.
 
-## ✨ 機能一覧
+## ✨ Features
 
-### 🎯 基本機能
-- ✅ 前日分のタイムエントリーからタグ未設定を自動検出
-- ✅ プロジェクト名に基づく自動タグ付け
-- ✅ 詳細なログ出力（JSON形式）
+### 🎯 Core Features
+- ✅ Auto-detect untagged time entries from previous day
+- ✅ Automatic tagging based on project names
+- ✅ Detailed logging output (JSON format)
 
-### 📅 日付処理
-- ✅ 特定日付の指定（--date）
-- ✅ 今日のエントリー処理（--today）
-- ✅ 過去複数日の一括処理（--days）
-- ✅ タイムゾーン対応（.env設定）
+### 📅 Date Processing
+- ✅ Specific date targeting (--date)
+- ✅ Today's entries processing (--today)
+- ✅ Multiple past days batch processing (--days)
+- ✅ Timezone support (.env configuration)
 
-### 🛡️ 安全性
-- ✅ Dry-runモードで事前確認
-- ✅ APIトークン・ワークスペースの検証
-- ✅ config.jsonの構文チェック
-- ✅ 詳細なエラーメッセージ
+### 🛡️ Safety
+- ✅ Dry-run mode for preview
+- ✅ API token & workspace validation
+- ✅ config.json syntax checking
+- ✅ Detailed error messages
 
-### 🚀 パフォーマンス
-- ✅ プロジェクト情報のキャッシュ
-- ✅ ネットワークエラー時のリトライ（指数バックオフ）
-- ✅ 効率的なAPI呼び出し
+### 🚀 Performance
+- ✅ Project information caching
+- ✅ Network error retry (exponential backoff)
+- ✅ Efficient API calls
 
-### 🎨 ユーザビリティ
-- ✅ インタラクティブモード（対話的タグ選択）
-- ✅ カラフルな出力とアイコン
-- ✅ 包括的なヘルプとドキュメント
-- ✅ 進捗表示とキャッシュ統計
+### 🎨 User Experience
+- ✅ Interactive mode (dialog-based tag selection)
+- ✅ Colorful output with icons
+- ✅ Comprehensive help and documentation
+- ✅ Progress display and cache statistics
 
-## 🎯 実行方法
+## 🎯 Usage
 
-### 基本的な使い方
+### Basic Usage
 
-すべての設定が完了したら、以下のコマンドで実行：
+After completing all setup, run:
 
 ```bash
 python main.py
 ```
 
-### 詳細なオプション
+### Detailed Options
 
-ツールには多くの便利なオプションが用意されています：
+The tool provides many convenient options:
 
-#### 日付指定オプション
+#### Date Options
 ```bash
-# デフォルト: 昨日のエントリーを処理
+# Default: process yesterday's entries
 python main.py
 
-# 特定の日付を処理
+# Process specific date
 python main.py --date 2025-07-01
 
-# 今日のエントリーを処理
+# Process today's entries
 python main.py --today
 
-# 過去3日分を一括処理
+# Process past 3 days
 python main.py --days 3
 ```
 
-#### 安全確認オプション
+#### Safety Options
 ```bash
-# 実際に更新せずに対象エントリーを確認（推奨）
+# Preview target entries without actually updating (recommended)
 python main.py --dry-run
 
-# 特定日付をdry-runで確認
+# Dry-run for specific date
 python main.py --date 2025-07-01 --dry-run
 ```
 
-#### インタラクティブモード
+#### Interactive Mode
 ```bash
-# 対話的にタグを選択・編集
+# Select/edit tags interactively
 python main.py --interactive
 
-# インタラクティブモードでdry-run
+# Interactive mode with dry-run
 python main.py --interactive --dry-run
 ```
 
-インタラクティブモードでは、各エントリーに対して以下の選択肢が表示されます：
-- **1. 提案されたタグを使用**: config.jsonで定義されたタグを自動適用
-- **2. カスタムタグを入力**: 手動でタグを入力（カンマ区切りで複数可）
-- **3. よく使われるタグから選択**: 既存のタグから番号で選択
-- **4. スキップ**: そのエントリーにはタグを追加しない
+In interactive mode, you'll see these options for each entry:
+- **1. Use suggested tags**: Auto-apply tags defined in config.json
+- **2. Enter custom tags**: Manually input tags (comma-separated for multiple)
+- **3. Choose from commonly used tags**: Select by number from existing tags
+- **4. Skip**: Don't add tags to this entry
 
-#### その他のオプション
+#### Other Options
 ```bash
-# ヘルプを表示
+# Show help
 python main.py --help
 
-# バージョンを表示
+# Show version
 python main.py --version
 ```
 
-### タイムゾーン設定（オプション）
+### Timezone Configuration (Optional)
 
-デフォルトは日本時間（Asia/Tokyo）ですが、.envファイルで変更可能：
+Default is Japan time (Asia/Tokyo), but can be changed in .env file:
 
 ```bash
-# .envファイルに追加
-TIMEZONE=America/New_York  # ニューヨーク時間
-TIMEZONE=Europe/London     # ロンドン時間
-TIMEZONE=UTC              # UTC時間
+# Add to .env file
+TIMEZONE=America/New_York  # New York time
+TIMEZONE=Europe/London     # London time
+TIMEZONE=UTC              # UTC time
 ```
 
-## 📊 実行結果の見方
+## 📊 Understanding Output
 
-### 通常モード
-実行すると以下のような出力が表示されます：
+### Normal Mode
+When executed, you'll see output like:
 
 ```
 ✅ Config validation passed: 11 projects defined
 🔐 Validating API access...
-✅ API token valid for user: あなたの名前 (email@example.com)
-✅ Workspace access confirmed: ワークスペース名 (ID: 1234567)
+✅ API token valid for user: Your Name (email@example.com)
+✅ Workspace access confirmed: Workspace Name (ID: 1234567)
 
 ==================================================
 🔍 Processing date: 2025-07-04 (Asia/Tokyo)
 ==================================================
 📊 Found 15 time entries
-✅ 社内ミーティング -> ['meeting', 'internal']
-✅ A社案件 -> ['client', 'development']
-❌ B社案件 403 Forbidden
+✅ Internal Meeting -> ['meeting', 'internal']
+✅ Client A Project -> ['client', 'development']
+❌ Client B Project 403 Forbidden
 
 📈 Summary for 2025-07-04:
    Total entries: 15
@@ -243,13 +245,13 @@ TIMEZONE=UTC              # UTC時間
 💾 Project cache: 5 projects cached
 ```
 
-### Dry-runモード
+### Dry-run Mode
 ```bash
 python main.py --dry-run
 ```
 ```
-🔍 [DRY RUN] 社内ミーティング -> ['meeting', 'internal']
-🔍 [DRY RUN] A社案件 -> ['client', 'development']
+🔍 [DRY RUN] Internal Meeting -> ['meeting', 'internal']
+🔍 [DRY RUN] Client A Project -> ['client', 'development']
 
 📈 Summary for 2025-07-04:
    Total entries: 15
@@ -258,77 +260,77 @@ python main.py --dry-run
    Failed: 0
 ```
 
-### アイコンの意味
-- ✅ : タグの追加に成功
-- 🔍 : Dry-runモード（実際の更新なし）
-- ❌ : タグの追加に失敗（権限エラーなど）
-- 💾 : プロジェクトキャッシュの統計
-- 📝 : ログファイルの保存場所
+### Icon Meanings
+- ✅ : Successfully added tags
+- 🔍 : Dry-run mode (no actual updates)
+- ❌ : Failed to add tags (permission error, etc.)
+- 💾 : Project cache statistics
+- 📝 : Log file location
 
-## 🔧 トラブルシューティング
+## 🔧 Troubleshooting
 
-### エラー: "TOGGL_API_TOKEN and WORKSPACE_ID must be set"
+### Error: "TOGGL_API_TOKEN and WORKSPACE_ID must be set"
 
-`.env` ファイルが正しく設定されているか確認してください。
+Check if `.env` file is properly configured.
 
-### エラー: "401 Unauthorized"
+### Error: "401 Unauthorized"
 
-API トークンが正しいか確認してください。トークンが期限切れの場合は新しいものを取得してください。
+Verify your API token is correct. If expired, get a new one.
 
-### エラー: "403 Forbidden"
+### Error: "403 Forbidden"
 
-- ワークスペース ID が正しいか確認
-- 該当のワークスペースへのアクセス権限があるか確認
+- Check if workspace ID is correct
+- Verify you have access permissions to the workspace
 
-### タグが追加されない
+### Tags not being added
 
-- プロジェクト名が `config.json` の設定と完全に一致しているか確認
-- 対象のエントリーに既にタグが設定されていないか確認（既にタグがある場合はスキップされます）
+- Check if project name exactly matches the configuration in `config.json`
+- Verify target entries don't already have tags (entries with existing tags are skipped)
 
-### エラー: "Invalid timezone"
+### Error: "Invalid timezone"
 
-`.env` ファイルのTIMEZONE設定を確認してください：
-- 正しい形式: `Asia/Tokyo`, `America/New_York`, `Europe/London`, `UTC`
-- [タイムゾーン一覧](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)で確認可能
+Check TIMEZONE setting in `.env` file:
+- Correct format: `Asia/Tokyo`, `America/New_York`, `Europe/London`, `UTC`
+- See [Timezone list](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)
 
-### config.jsonのエラー
+### config.json errors
 
-- JSON形式が正しいか確認（コンマ、括弧、引用符）
-- プロジェクト名が文字列、タグが配列になっているか確認
-- 最後の項目の後にコンマがないか確認
+- Check JSON format (commas, brackets, quotes)
+- Verify project names are strings and tags are arrays
+- Ensure no trailing comma after the last item
 
-### インタラクティブモードで応答しない
+### Interactive mode not responding
 
-- 数字（1-4）を入力してEnterキーを押してください
-- Ctrl+Cで中断可能です
+- Enter a number (1-4) and press Enter
+- Use Ctrl+C to cancel
 
-## 🤖 自動実行の設定（オプション）
+## 🤖 Automated Execution (Optional)
 
-### Mac/Linux での cron 設定例
+### Mac/Linux cron setup
 
-毎日朝 9 時に自動実行する場合：
+To run automatically at 9 AM daily:
 
 ```bash
 crontab -e
 ```
 
-以下を追加：
+Add:
 ```
 0 9 * * * cd /path/to/toggl-tag-fixer && /path/to/venv/bin/python main.py >> log.txt 2>&1
 ```
 
-### Windows でのタスクスケジューラ設定
+### Windows Task Scheduler
 
-1. タスクスケジューラを開く
-2. 「基本タスクの作成」を選択
-3. トリガーで「毎日」を選択
-4. 操作で以下を設定：
-   - プログラム: `C:\path\to\venv\Scripts\python.exe`
-   - 引数: `main.py`
-   - 開始: `C:\path\to\toggl-tag-fixer`
+1. Open Task Scheduler
+2. Select "Create Basic Task"
+3. Set trigger to "Daily"
+4. Configure action:
+   - Program: `C:\path\to\venv\Scripts\python.exe`
+   - Arguments: `main.py`
+   - Start in: `C:\path\to\toggl-tag-fixer`
 
-## 📝 注意事項
+## 📝 Notes
 
-- このツールはデフォルトで前日のエントリーを処理します（タイムゾーン設定に依存）
-- 既にタグが設定されているエントリーはスキップされます
-- プロジェクトが設定されていないエントリーもスキップされます
+- This tool processes previous day's entries by default (depends on timezone setting)
+- Entries with existing tags are skipped
+- Entries without assigned projects are also skipped
