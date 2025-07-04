@@ -39,11 +39,11 @@ pip install -r requirements.txt
 ### ステップ 4: Toggl API トークンの取得
 
 1. [Toggl Track](https://track.toggl.com) にログイン
-2. 右上のプロフィールアイコンをクリック
-3. 「Profile settings」を選択
-4. ページ下部の「API Token」セクションまでスクロール
-5. 「Click to reveal」をクリックしてトークンを表示
-6. トークンをコピー
+2. 左のサイドバーを開く
+3. サイドバー内の「Profile」ボタンをクリック
+4. プロフィールページが開いたら、一番下までスクロール
+5. 「API Token」セクションの「Click to reveal」または「Show」をクリックしてトークンを表示
+6. 表示された32文字の英数字のトークンをコピー
 
 ### ステップ 5: ワークスペース ID の取得
 
@@ -59,6 +59,10 @@ pip install -r requirements.txt
 TOGGL_API_TOKEN=あなたのAPIトークン
 WORKSPACE_ID=あなたのワークスペースID
 ```
+
+**どこの値を入力するか：**
+- `TOGGL_API_TOKEN=` の後に、ステップ 4 でコピーしたAPIトークン（32文字の英数字）を貼り付けます
+- `WORKSPACE_ID=` の後に、ステップ 5 で確認したワークスペースID（7桁程度の数字）を入力します
 
 例：
 ```bash
