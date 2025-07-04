@@ -146,7 +146,14 @@ Example:
 
 ## 🎯 Usage
 
-### Basic Usage
+### Quick Start (Mac Users)
+
+**For first-time setup:**
+1. Double-click `run-setup.command` to automatically set up the environment
+2. Edit `.env` and `config.json` files as guided
+3. Double-click `run-toggl-tag-fixer.command` to run the tool
+
+### Basic Usage (Command Line)
 
 After completing all setup, run:
 
